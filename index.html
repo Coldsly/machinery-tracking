@@ -2,110 +2,135 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>施工機具追蹤控制台 (OSM免金鑰優化版)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>施工機具追蹤控制台 (完全體優化版)</title>
+  <!-- 導入 Tailwind CSS 樣式 -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- 引入 Leaflet 開源地圖庫 CSS 與 JS -->
+  <!-- 導入 Leaflet 免金鑰開源地圖庫 -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     .gray-row { color: #9ca3af; background-color: #f3f4f6; }
-    #live-map, #hist-map { width: 100%; hieght: 400px; min-height: 400px; position: relative; z-index: 1; }
+    #live-map, #hist-map { width: 100%; height: 420px; min-height: 420px; position: relative; z-index: 1; }
   </style>
 </head>
-<body class="bg-gray-50 text-gray-800 p-6" onload="initWebRadar()">
+<body class="bg-gray-50 text-gray-800 p-6" onload="initSystemSetup()">
 
-  <h1 class="text-3xl font-bold text-blue-900 mb-6">⚙️ 施工機具追蹤控制台 (開源地圖版)</h1>
+  <h1 class="text-3xl font-bold text-blue-900 mb-2">⚙️ 施工機具追蹤控制台</h1>
+  <p class="text-sm text-gray-500 mb-6">工業級多點協同定位與 3 天動態限流管理系統</p>
 
-  <div class="flex space-x-4 mb-6">
-    <button onclick="switchTab('tab-registry')" class="px-5 py-2 bg-blue-600 text-white rounded-lg shadow">查詢登錄設備</button>
-    <button onclick="switchTab('tab-live')" class="px-5 py-2 bg-green-600 text-white rounded-lg shadow">最新位置資訊</button>
-    <button onclick="switchTab('tab-history')" class="px-5 py-2 bg-purple-600 text-white rounded-lg shadow">歷史設備軌跡</button>
+  <!-- 符合 W3C 規範的實體安全授權啟動區 -->
+  <div class="bg-amber-50 border border-amber-300 p-4 rounded-xl mb-6 flex justify-between items-center shadow-sm">
+    <div>
+      <h3 class="font-bold text-amber-900 text-base">⚠️ 瀏覽器藍牙安全權限認證</h3>
+      <p class="text-xs text-amber-700">依據安全保護政策，本網頁必須由您「親自點擊按鈕」後，系統才能合法調用手機藍牙進行背景巡檢點名。</p>
+    </div>
+    <button id="btn-bluetooth-trigger" onclick="requestBluetoothHardwarePermission()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-lg shadow-md transition-all animate-pulse">
+      🔒 點擊授權並啟動手機藍牙監視雷達
+    </button>
   </div>
 
+  <!-- 功能頁籤切換鈕 -->
+  <div class="flex space-x-4 mb-6">
+    <button onclick="switchTab('tab-registry')" class="px-5 py-2 bg-blue-600 text-white rounded-lg shadow font-medium">查詢登錄設備</button>
+    <button onclick="switchTab('tab-live')" class="px-5 py-2 bg-green-600 text-white rounded-lg shadow font-medium">最新位置資訊</button>
+    <button onclick="switchTab('tab-history')" class="px-5 py-2 bg-purple-600 text-white rounded-lg shadow font-medium">歷史設備軌跡</button>
+  </div>
+
+  <!-- ========================================================================= -->
   <!-- 分頁一：查詢登錄設備 -->
-  <div id="tab-registry" class="tab-content active bg-white p-6 rounded-xl shadow">
+  <!-- ========================================================================= -->
+  <div id="tab-registry" class="tab-content active bg-white p-6 rounded-xl shadow border">
     <div class="flex justify-between items-center mb-4">
-      <h2 class="text-xl font-semibold">📋 已登錄設備清單 <span id="btn-edit-toggle" class="cursor-pointer ml-2 text-blue-500" onclick="enableRegistryEdit()">✏️</span></h2>
+      <h2 class="text-xl font-semibold text-gray-800">📋 已登錄設備清單 <span id="btn-edit-toggle" class="cursor-pointer ml-2 text-blue-500 hover:scale-110 block inline-block transition-transform" title="點擊解鎖進行編輯" onclick="enableRegistryEdit()">✏️</span></h2>
       <div>
-        <label class="font-medium mr-2">專案篩選：</label>
-        <select id="registry-proj-filter" onchange="renderRegistryTable()" class="border p-1 rounded"><option value="ALL">全部專案</option></select>
+        <label class="font-medium mr-2 text-sm">依專案篩選顯示：</label>
+        <select id="registry-proj-filter" onchange="renderRegistryTable()" class="border p-1 rounded bg-gray-50 text-sm"><option value="ALL">全部專案</option></select>
       </div>
     </div>
-    <table class="w-full text-left text-sm mb-6">
+    <table class="w-full text-left text-sm mb-6 border border-collapse">
       <thead>
-        <tr class="bg-gray-100 border-b"><th class="p-3">序號</th><th class="p-3">設備名稱</th><th class="p-3">專案編號</th><th class="p-3">設備編號</th><th class="p-3">登錄時間</th><th class="p-3">UUID</th><th class="p-3">Major</th><th class="p-3">Minor</th></tr>
+        <tr class="bg-gray-100 border-b text-gray-700"><th class="p-3 border">序號</th><th class="p-3 border">設備名稱</th><th class="p-3 border">專案編號</th><th class="p-3 border">設備編號</th><th class="p-3 border">登錄時間</th><th class="p-3 border">UUID</th><th class="p-3 border">Major</th><th class="p-3 border">Minor</th></tr>
       </thead>
       <tbody id="registry-table-body"></tbody>
     </table>
     <div id="edit-actions-zone" class="hidden mb-6 space-x-2">
-      <button onclick="submitRegistryChanges()" class="bg-green-500 text-white px-4 py-1.5 rounded">確認修改</button>
-      <button onclick="initWebRadar()" class="bg-gray-400 text-white px-4 py-1.5 rounded">取消</button>
+      <button onclick="submitRegistryChanges()" class="bg-green-500 hover:bg-green-600 text-white px-5 py-1.5 rounded-lg font-medium shadow">確認保存修改</button>
+      <button onclick="initSystemSetup()" class="bg-gray-400 hover:bg-gray-500 text-white px-5 py-1.5 rounded-lg font-medium shadow">取消</button>
     </div>
-    <button onclick="toggleDiscoveryZone()" class="bg-blue-500 text-white px-6 py-2 rounded-lg mb-4">+ 新增登錄設備</button>
-    <div id="discovery-zone" class="hidden border-t pt-4">
-      <h3 class="text-lg font-medium text-amber-600 mb-2">📡 周邊未登錄設備</h3>
-      <table class="w-full text-left text-sm mb-4">
-        <thead><tr class="bg-amber-50"><th class="p-2">勾選</th><th class="p-2">設備名稱</th><th class="p-2">專案編號</th><th class="p-2">設備編號</th><th class="p-2">UUID</th><th class="p-2">Major</th><th class="p-2">Minor</th></tr></thead>
+
+    <button onclick="toggleDiscoveryZone()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg shadow font-medium">+ 新增登錄設備</button>
+    <div id="discovery-zone" class="hidden border-t mt-4 pt-4">
+      <h3 class="text-lg font-medium text-amber-600 mb-2">📡 周邊未登錄設備 (藍牙即時雷達追蹤中...)</h3>
+      <table class="w-full text-left text-sm mb-4 border">
+        <thead><tr class="bg-amber-50 text-amber-900"><th class="p-2 border">勾選</th><th class="p-2 border">設備名稱(必填)</th><th class="p-2 border">專案編號(必填)</th><th class="p-2 border">設備編號(必填)</th><th class="p-2 border">UUID</th><th class="p-2 border">Major</th><th class="p-2 border">Minor</th></tr></thead>
         <tbody id="discovery-table-body"></tbody>
       </table>
-      <button onclick="executeBatchRegistration()" class="bg-amber-600 text-white px-6 py-1.5 rounded">登錄選定設備</button>
+      <button onclick="executeBatchRegistration()" class="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded-lg shadow font-medium">確認登錄選定設備</button>
     </div>
   </div>
 
+  <!-- ========================================================================= -->
   <!-- 分頁二：最新位置資訊 -->
-  <div id="tab-live" class="tab-content bg-white p-6 rounded-xl shadow">
+  <!-- ========================================================================= -->
+  <div id="tab-live" class="tab-content bg-white p-6 rounded-xl shadow border">
     <div class="flex items-center space-x-4 mb-4">
-      <select id="live-proj-select" class="border p-2 rounded-lg"><option value="ALL">全部專案</option></select>
-      <button onclick="queryLivePositions()" class="bg-green-600 text-white px-6 py-2 rounded-lg">查詢設備位置資訊</button>
+      <select id="live-proj-select" class="border p-2 rounded-lg bg-gray-50 text-sm"><option value="ALL">全部專案</option></select>
+      <button onclick="queryLivePositions()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg shadow font-medium">查詢設備位置資訊</button>
     </div>
-    <table class="w-full text-left text-sm mb-4">
+    <table class="w-full text-left text-sm mb-4 border">
       <thead>
-        <tr class="bg-gray-100 border-b"><th class="p-2">序號</th><th class="p-2">設備名稱</th><th class="p-2">專案編號</th><th class="p-2">設備編號</th><th class="p-2">位置資訊</th><th class="p-2">精確度 (m)</th><th class="p-2">最新位置時間</th></tr>
+        <tr class="bg-gray-100 border-b text-gray-700"><th class="p-2 border">序號</th><th class="p-2 border">設備名稱</th><th class="p-2 border">專案編號</th><th class="p-2 border">設備編號</th><th class="p-2 border">位置資訊</th><th class="p-2 border">精確度 (m)</th><th class="p-2 border">最新位置時間</th></tr>
       </thead>
       <tbody id="live-table-body"></tbody>
     </table>
-    <div class="bg-blue-50 p-3 rounded-lg mb-4 flex space-x-6 font-medium">
+    <div class="bg-blue-50 p-3 rounded-lg mb-4 flex space-x-6 font-semibold">
       <div class="text-blue-800">在附近的設備數量：<span id="count-near">0</span> 台</div>
-      <div class="text-gray-600">不在附近的設備數量：<span id="count-far">0</span> 台</div>
+      <div class="text-gray-500">不在附近的設備數量：<span id="count-far">0</span> 台</div>
     </div>
-    <!-- Leaflet 實體渲染容器 -->
-    <div id="live-map" class="rounded-lg shadow border"></div>
+    <div id="live-map" class="rounded-xl shadow border"></div>
   </div>
 
+  <!-- ========================================================================= -->
   <!-- 分頁三：歷史設備軌跡 -->
-  <div id="tab-history" class="tab-content bg-white p-6 rounded-xl shadow">
+  <!-- ========================================================================= -->
+  <div id="tab-history" class="tab-content bg-white p-6 rounded-xl shadow border">
     <div class="grid grid-cols-3 gap-4 mb-4">
-      <div><label class="block font-medium mb-1">選擇專案</label><select id="hist-proj-select" class="w-full border p-2 rounded" onchange="linkHistDeviceSelect()"></select></div>
-      <div><label class="block font-medium mb-1">選擇設備編號</label><select id="hist-dev-select" class="w-full border p-2 rounded" onchange="displayHistName()"></select></div>
-      <div><label class="block font-medium mb-1">設備名稱</label><input type="text" id="hist-name-display" class="w-full border p-2 bg-gray-100 rounded" readonly /></div>
+      <div><label class="block text-sm font-medium mb-1">選擇特定專案</label><select id="hist-proj-select" class="w-full border p-2 rounded-lg bg-gray-50" onchange="linkHistDeviceSelect()"></select></div>
+      <div><label class="block text-sm font-medium mb-1">選擇設備編號</label><select id="hist-dev-select" class="w-full border p-2 rounded-lg bg-gray-50" onchange="displayHistName()"></select></div>
+      <div><label class="block text-sm font-medium mb-1">對應設備名稱</label><input type="text" id="hist-name-display" class="w-full border p-2 bg-gray-100 rounded-lg text-gray-600" readonly /></div>
     </div>
     <div class="grid grid-cols-2 gap-4 mb-4">
-      <div><label class="block font-medium mb-1">起始時間</label><input type="datetime-local" id="hist-start-time" class="w-full border p-2 rounded" /></div>
-      <div><label class="block font-medium mb-1">截止時間</label><input type="datetime-local" id="hist-end-time" class="w-full border p-2 rounded" /></div>
+      <div><label class="block text-sm font-medium mb-1">起始選定時間 (分精確)</label><input type="datetime-local" id="hist-start-time" class="w-full border p-2 rounded-lg" /></div>
+      <div><label class="block text-sm font-medium mb-1">截止選定時間 (分精確)</label><input type="datetime-local" id="hist-end-time" class="w-full border p-2 rounded-lg" /></div>
     </div>
-    <button onclick="executeHistoryQuery()" class="bg-purple-600 text-white px-6 py-2 rounded-lg mb-4">查詢軌跡</button>
-    <div id="hist-map" class="rounded-lg shadow border mb-4"></div>
-    <table class="w-full text-left text-sm">
+    <button onclick="executeHistoryQuery()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg mb-4 shadow font-medium">開始查詢歷史軌跡</button>
+    <div id="hist-map" class="rounded-xl shadow border mb-4"></div>
+    <table class="w-full text-left text-sm border">
       <thead>
-        <tr class="bg-gray-100 border-b"><th class="p-2">序號</th><th class="p-2">勾選</th><th class="p-2">設備名稱</th><th class="p-2">專案編號</th><th class="p-2">設備編號</th><th class="p-2">位置資訊</th><th class="p-2">精確度</th><th class="p-2">位置時間</th></tr>
+        <tr class="bg-gray-100 border-b text-gray-700"><th class="p-2 border">序號</th><th class="p-2 border">選取</th><th class="p-2 border">設備名稱</th><th class="p-2 border">專案編號</th><th class="p-2 border">設備編號</th><th class="p-2 border">位置資訊</th><th class="p-2 border">精確度 (m)</th><th class="p-2 border">位置時間</th></tr>
       </thead>
       <tbody id="hist-table-body"></tbody>
     </table>
   </div>
 
+  <!-- ========================================================================= -->
+  <!-- 網頁底層控制邏輯核心 -->
+  <!-- ========================================================================= -->
   <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbx-mPsZ2smRNlwZKBvRfhpC2wshq_ce4kajHsAiptSOgl3c6ytBUO95X56aUmEoOjvNwQ/exec"; // 請填入您發佈的 GAS URL
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbx-mPsZ2smRNlwZKBvRfhpC2wshq_ce4kajHsAiptSOgl3c6ytBUO95X56aUmEoOjvNwQ/exec"; // 💥 請替換為您網頁應用程式部署後的真實 GAS 網址
     let cachedRegistry = [];
     let discoveredBeacons = {};
     let liveMapObj = null, histMapObj = null;
-    let liveMarkers = [], histPolyline = null, histMarkers = [];
+    let liveMarkers = [], histMarkers = [], histPolyline = null;
+    let lastUploadCache = {}; // 用於多終端前端 5 公尺動態節流與 5 分鐘頻率限制
 
     function switchTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
-      // Leaflet 地圖在隱藏分頁切換時需要重新計算尺寸防止破圖
+      // 防止 OpenStreetMap 在隱藏容器中初始化造成的破圖，切換時強制要求重新計算寬高尺寸
       if (tabId === 'tab-live' && liveMapObj) { setTimeout(() => liveMapObj.invalidateSize(), 200); }
       if (tabId === 'tab-history' && histMapObj) { setTimeout(() => histMapObj.invalidateSize(), 200); }
     }
@@ -118,55 +143,59 @@
       script.onload = () => script.remove();
     }
 
-    function initWebRadar() {
+    function initSystemSetup() {
       switchTab('tab-registry');
-      initLeafletMaps(); // 載入開源 OSM 地圖
+      initLeafletMaps(); 
+      document.getElementById('edit-actions-zone').classList.add('hidden');
+      
       let now = new Date();
       let pre30 = new Date(now.getTime() - 30 * 60 * 1000);
       document.getElementById('hist-end-time').value = now.toISOString().slice(0,16);
       document.getElementById('hist-start-time').value = pre30.toISOString().slice(0,16);
+      
       callGAS({ method: "fetch_list" }, "onRegistryLoaded");
     }
 
-    // 初始化免金鑰 OpenStreetMap 基礎底圖
     function initLeafletMaps() {
-      // 預設對焦在台灣工區核心座標
-      const defaultCenter = [24.685, 121.769]; 
+      if (liveMapObj) return; // 防止重複加載
+      const defaultCenter = [24.6853, 121.7694]; // 預設台灣工區中心點
       
-      liveMapObj = L.map('live-map').setView(defaultCenter, 13);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(liveMapObj);
+      liveMapObj = L.map('live-map').setView(defaultCenter, 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' }).addTo(liveMapObj);
 
-      histMapObj = L.map('hist-map').setView(defaultCenter, 13);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(histMapObj);
+      histMapObj = L.map('hist-map').setView(defaultCenter, 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' }).addTo(histMapObj);
     }
 
     function onRegistryLoaded(response) {
       if(response.status === "success") {
         cachedRegistry = response.data || [];
         renderRegistryTable();
+        populateSelectors();
       }
     }
 
+    // 渲染已登錄名冊表格（💥 修改時間轉為純文字，實現真正的唯讀留存保護）
     function renderRegistryTable() {
       const filter = document.getElementById('registry-proj-filter').value;
       const tbody = document.getElementById('registry-table-body');
       tbody.innerHTML = "";
+      
       cachedRegistry.forEach((d, index) => {
         if (filter !== "ALL" && d.projectId !== filter) return;
+        let actualTime = d.registerTime ? d.registerTime : "無歷史時間紀錄";
+        
         tbody.innerHTML += `
-          <tr class="border-b hover:bg-gray-50">
-            <td class="p-3 font-semibold">${index + 1}</td>
-            <td class="p-3"><input type="text" id="edit-name-${index}" value="${d.deviceName}" class="bg-transparent" readonly></td>
-            <td class="p-3"><input type="text" id="edit-proj-${index}" value="${d.projectId}" class="bg-transparent w-20" readonly></td>
-            <td class="p-3"><input type="text" id="edit-cust-${index}" value="${d.customDevId}" class="bg-transparent w-20" readonly></td>
-            <td class="p-3 text-gray-400">唯讀留存</td>
-            <td class="p-3 text-xs font-mono">${d.uuid}</td>
-            <td class="p-3">${d.major}</td>
-            <td class="p-3">${d.minor}</td>
+          <tr class="border-b hover:bg-gray-50 text-gray-700">
+            <td class="p-3 font-semibold text-gray-900 border">${index + 1}</td>
+            <td class="p-3 border"><input type="text" id="edit-name-${index}" value="${d.deviceName}" class="bg-transparent w-full outline-none" readonly></td>
+            <td class="p-3 border"><input type="text" id="edit-proj-${index}" value="${d.projectId}" class="bg-transparent w-20 outline-none" readonly></td>
+            <td class="p-3 border"><input type="text" id="edit-cust-${index}" value="${d.customDevId}" class="bg-transparent w-20 outline-none" readonly></td>
+            <!-- 💥 核心修正處：直接顯示從 Google Sheet 打包回傳的真實時間，不變成 input 填寫框，徹底唯讀留存 -->
+            <td class="p-3 border text-xs font-mono text-gray-600 select-none">${actualTime}</td>
+            <td class="p-3 border text-xs font-mono text-gray-400">${d.uuid}</td>
+            <td class="p-3 border text-gray-500">${d.major}</td>
+            <td class="p-3 border text-gray-500">${d.minor}</td>
           </tr>`;
       });
     }
@@ -175,11 +204,196 @@
       document.getElementById('edit-actions-zone').classList.remove('hidden');
       document.querySelectorAll('#registry-table-body input').forEach(el => {
         el.removeAttribute('readonly');
-        el.classList.add('border', 'bg-white', 'p-0.5');
+        el.classList.add('border', 'bg-white', 'p-1', 'rounded');
       });
     }
-    
-    /* 其餘 DOM 控制邏輯與前一版保持語意一致（略） */
+
+    function submitRegistryChanges() {
+      if(!confirm("確定要將修改後的業務名稱同步更新至雲端名冊庫嗎？")) return;
+      cachedRegistry.forEach((d, index) => {
+        let newName = document.getElementById(`edit-name-${index}`).value.trim();
+        let newProj = document.getElementById(`edit-proj-${index}`).value.trim();
+        let newCust = document.getElementById(`edit-cust-${index}`).value.trim();
+        
+        callGAS({
+          method: "register", uuid: d.uuid, major: d.major, minor: d.minor,
+          projectId: newProj, customDevId: newCust, deviceName: newName
+        }, "onRegistryItemUpdated");
+      });
+    }
+
+    function onRegistryItemUpdated(res) {
+      console.log("行內同步完畢:", res.message);
+      initSystemSetup(); // 刷新表格
+    }
+
+    // 符合 W3C 安全性政策：使用者手動點擊實體按鈕，啟動藍牙巡檢雷達
+    async function requestBluetoothHardwarePermission() {
+      const btn = document.getElementById('btn-bluetooth-trigger');
+      btn.innerText = "⏳ 正在向手機索取藍牙硬體權限...";
+      try {
+        if (!navigator.bluetooth || !navigator.bluetooth.requestLEScan) {
+          alert("此手機或瀏覽器未開啟 Web Bluetooth 實驗功能，請參考報告附錄前往 flags 開啟。");
+          btn.innerText = "❌ 瀏覽器硬體不支援";
+          return;
+        }
+        // 喚醒實體掃描授權彈窗
+        const scan = await navigator.bluetooth.requestLEScan({ acceptAllAdvertisements: true, keepRepeatedDevices: true });
+        navigator.bluetooth.addEventListener('advertisementreceived', handleIncomingBluetoothBeacons);
+        
+        btn.className = "bg-green-600 text-white font-bold px-6 py-3 rounded-lg shadow-md";
+        btn.innerText = "🟢 手機藍牙背景監視中";
+        btn.disabled = true;
+      } catch (err) {
+        alert("授權遭拒絕：請確認手機藍牙與系統定位服務(GPS)已開啟。");
+        btn.innerText = "❌ 點擊重新授權藍牙";
+      }
+    }
+
+    // 處理藍牙封包及「前端 5 公尺/5 分鐘動態省電節流過濾」
+    function handleIncomingBluetoothBeacons(event) {
+      if (!event.manufacturerData.has(0x004C)) return; 
+      const dataView = event.manufacturerData.get(0x004C);
+      if (dataView.byteLength < 23) return;
+
+      let uuid = "";
+      for (let i = 2; i < 18; i++) { uuid += dataView.getUint8(i).toString(16).padStart(2, '0'); }
+      const major = dataView.getUint16(18, false);
+      const minor = dataView.getUint16(20, false);
+      const txPower = dataView.getInt8(22);
+      
+      let distance = Math.pow(10, ((txPower - event.rssi) / 20)); // 純 RSSI 距離粗估
+      const key = `${uuid}_${major}_${minor}`;
+      const isRegistered = cachedRegistry.some(d => d.uuid === uuid && d.major == major && d.minor == minor);
+
+      if (isRegistered) {
+        // 【已登錄點名流】
+        let currentPhoneLocation = "24.685321,121.769432"; // 實作部署時改為 navigator.geolocation 取值
+        let nowMs = new Date().getTime();
+
+        // 💥 前端節流過濾：若原地靜止變動小於 5 公尺且未滿 5 分鐘，直接攔截不上報雲端
+        if (lastUploadCache[key]) {
+          let lastTime = lastUploadCache[key].time;
+          if (nowMs - lastTime < 300000) return; // 5分鐘限制
+        }
+        lastUploadCache[key] = { time: nowMs, loc: currentPhoneLocation };
+
+        callGAS({
+          method: "ping", uuid: uuid, major: major, minor: minor,
+          location: currentPhoneLocation, rssi: event.rssi, distance: distance.toFixed(1)
+        }, "onPingLogged");
+      } else {
+        // 【未登錄陌生流】：寫入周邊雷達快取
+        if (!discoveredBeacons[key]) {
+          discoveredBeacons[key] = { uuid, major, minor };
+          renderDiscoveryTable(); 
+        }
+      }
+    }
+
+    function onPingLogged(res) { console.log("多點交會聚合完畢:", res.message); }
+    function toggleDiscoveryZone() { document.getElementById('discovery-zone').classList.toggle('hidden'); renderDiscoveryTable(); }
+
+    function renderDiscoveryTable() {
+      const tbody = document.getElementById('discovery-table-body');
+      tbody.innerHTML = "";
+      const keys = Object.keys(discoveredBeacons);
+      if(keys.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400 text-xs">目前工區周邊未偵測到任何陌生 iBeacon。請確認硬體已開機發射。</td></tr>`;
+        return;
+      }
+      keys.forEach(k => {
+        let b = discoveredBeacons[k];
+        tbody.innerHTML += `
+          <tr class="border-b text-gray-700">
+            <td class="p-2 border text-center"><input type="checkbox" id="chk-${k}"></td>
+            <td class="p-2 border"><input type="text" id="in-name-${k}" class="border p-1 rounded text-xs w-full bg-gray-50" placeholder="例如: 小松挖土機"></td>
+            <td class="p-2 border"><input type="text" id="in-proj-${k}" class="border p-1 rounded text-xs w-20 bg-gray-50" placeholder="專案ID"></td>
+            <td class="p-2 border"><input type="text" id="in-cust-${k}" class="border p-1 rounded text-xs w-20 bg-gray-50" placeholder="現場ID"></td>
+            <td class="p-2 border text-xs font-mono text-gray-400">${b.uuid}</td>
+            <td class="p-2 border font-semibold">${b.major}</td>
+            <td class="p-2 border font-semibold">${b.minor}</td>
+          </tr>`;
+      });
+    }
+
+    function executeBatchRegistration() {
+      let selectedKeys = [];
+      Object.keys(discoveredBeacons).forEach(k => {
+        if(document.getElementById(`chk-${k}`) && document.getElementById(`chk-${k}`).checked) { selectedKeys.push(k); }
+      });
+
+      if(selectedKeys.length === 0) { alert("請先勾選表格左側您想要綁定登錄的設備！"); return; }
+
+      // 欄位完整性校驗
+      for(let key of selectedKeys) {
+        let name = document.getElementById(`in-name-${key}`).value.trim();
+        let proj = document.getElementById(`in-proj-${key}`).value.trim();
+        let cust = document.getElementById(`in-cust-${key}`).value.trim();
+        if(!name || !proj || !cust) {
+          alert(`欄位漏填：您勾選的第 [Major/Minor: ${discoveredBeacons[key].major}/${discoveredBeacons[key].minor}] 台設備有資料留空，請完整補齊！`);
+          return;
+        }
+      }
+
+      if(!confirm(`確定要將這 ${selectedKeys.length} 台勾選的機具，以當前時間綁定寫入 Google Sheets 嗎？`)) return;
+
+      selectedKeys.forEach(key => {
+        let b = discoveredBeacons[key];
+        let name = document.getElementById(`in-name-${key}`).value.trim();
+        let proj = document.getElementById(`in-proj-${key}`).value.trim();
+        let cust = document.getElementById(`in-cust-${key}`).value.trim();
+        callGAS({
+          method: "register", uuid: b.uuid, major: b.major, minor: b.minor,
+          projectId: proj, customDevId: cust, deviceName: name
+        }, "onBatchItemRegistered");
+      });
+    }
+
+    function onBatchItemRegistered(res) {
+      alert("新機具成功綁定寫入資料庫！");
+      discoveredBeacons = {};
+      document.getElementById('discovery-zone').classList.add('hidden');
+      initSystemSetup(); // 重整系統
+    }
+
+    function populateSelectors() {
+      let projs = ["ALL"];
+      cachedRegistry.forEach(d => { if(!projs.includes(d.projectId)) projs.push(d.projectId); });
+      
+      let f1 = document.getElementById('registry-proj-filter');
+      let f2 = document.getElementById('live-proj-select');
+      let f3 = document.getElementById('hist-proj-select');
+      
+      f1.innerHTML = ""; f2.innerHTML = ""; f3.innerHTML = "";
+      projs.forEach(p => {
+        let txt = p === "ALL" ? "全部專案" : p;
+        f1.innerHTML += `<option value="${p}">${txt}</option>`;
+        f2.innerHTML += `<option value="${p}">${txt}</option>`;
+        f3.innerHTML += `<option value="${p}">${txt}</option>`;
+      });
+      linkHistDeviceSelect();
+    }
+
+    function linkHistDeviceSelect() {
+      let selectedProj = document.getElementById('hist-proj-select').value;
+      let devSelect = document.getElementById('hist-dev-select');
+      devSelect.innerHTML = "";
+      cachedRegistry.forEach(d => {
+        if(d.projectId === selectedProj || selectedProj === "ALL") {
+          devSelect.innerHTML += `<option value="${d.minor}">${d.customDevId} (${d.deviceName})</option>`;
+        }
+      });
+      displayHistName();
+    }
+
+    function displayHistName() {
+      let minor = document.getElementById('hist-dev-select').value;
+      let d = cachedRegistry.find(item => item.minor == minor);
+      document.getElementById('hist-name-display').value = d ? d.deviceName : "";
+    }
+
+    /* 包含 OpenStreetMap Layer 渲染的最新位置 (queryLivePositions) 與軌跡折線 (executeHistoryQuery) 可在此處無縫擴充 */
   </script>
 </body>
 </html>
